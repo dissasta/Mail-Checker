@@ -2,6 +2,7 @@ from Tkinter import *
 import tkFileDialog
 import os
 import time
+import ttk
 from datetime import datetime
 
 globFont = "Verdana 8 bold"
@@ -20,15 +21,22 @@ class Verifier(object):
 	def connect(self):
 		pass
 
-
 class Job(object):
 	jobsList = []
+	jobsCount = 1
+	jobsResultsMain = []
+	jobsResultsCustom = []
+	jobsResultsMainFailed = []
+	jobsResultsCustomFailed = []
+
 	def __init__(self, host, accounts):
 		self.host = host
 		self.accounts = accounts
 		self.custom = []
 		self.done = False
+		self.id = Job.jobsCount
 		Job.jobsList.append(self)
+		Job.jobsCount += 1
 
 class Main_Window(Frame):
 	if not os.path.exists(logFolder):
@@ -39,6 +47,7 @@ class Main_Window(Frame):
 		self.master = master
 		self.hdEntryText = ''
 		self.hdButtonTick = BooleanVar()
+		self.boxValue = StringVar()
 		self.log = []
 		self.rows = 1
 		self.emailDir = {}
@@ -58,35 +67,41 @@ class Main_Window(Frame):
 	def createWindow(self):
 		self.mainFrame = Canvas(width=680, height=400, bg="GREY")
 		self.mainFrame.pack()
-		self.fnButton = Button(self.mainFrame, text = 'Choose input file', anchor = W, command=self.openFile)
-		self.svButton = Button(self.mainFrame, text = 'Choose output file', anchor = W, command=self.openOutputFile)
-		self.svLabel = Label(self.mainFrame, text='...', anchor = W, background = 'GREY')
-		self.fnLabel = Label(self.mainFrame, text='...', anchor = W, background = 'GREY')
-		self.hdLabel = Label(self.mainFrame, text='Additional queries:', anchor = W, background = 'GREY')
+		self.fnButton = Button(self.mainFrame, text = 'Choose input file', width = 15, command=self.openFile)
+		self.svButton = Button(self.mainFrame, text = 'Choose output file', width = 15, command=self.openOutputFile)
+		self.svLabel = Label(self.mainFrame, text='...', background = 'GREY')
+		self.fnLabel = Label(self.mainFrame, text='...', background = 'GREY')
+		self.hdLabel = Label(self.mainFrame, text='Custom queries:', background = 'GREY')
 		self.hdEntry = Text(self.mainFrame, height = 10, width = 20, background = '#424242', foreground = "#2195E7")
 		self.hdButton = Checkbutton(self.mainFrame, text="Exclusive Mode", variable=self.hdButtonTick, background = 'GREY')
-		self.countLabel = Label(self.mainFrame, text='1000 / 1000', anchor = E, background = 'GREY')
-		self.strtButton = Button(self.mainFrame, text= "START", anchor = W, command=self.runJobs)
+		self.countLabel = Label(self.mainFrame, text='1 / 1000', background = 'GREY')
+		self.strtButton = Button(self.mainFrame, text= "START", width = 8, command=self.runJobs)
+		self.thLabel = Label(self.mainFrame, text='Threads:', background='GREY')
+		self.thBox = ttk.Combobox(self.mainFrame, width = 2, textvariable = self.boxValue)
+		self.thBox['values'] = (1, 2, 3, 4, 5, 6)
+		self.thBox.current(0)
 		self.statLabel = Text(self.mainFrame, height = 10, width = 91, background = '#424242', state=DISABLED)
 		self.statLabel.tag_config('OK', foreground='GREEN')
 		self.statLabel.tag_config('WARN', foreground='RED')
 		self.statLabel.tag_config('NA', foreground='#2195E7')
 
 		self.fileButton = self.mainFrame.create_window(22, 20, anchor = NW, window = self.fnButton)
-		self.fileName = self.mainFrame.create_window(125, 22, anchor = NW, window = self.fnLabel)
-		self.savefileName = self.mainFrame.create_window(125, 52, anchor = NW, window = self.svLabel)
+		self.fileName = self.mainFrame.create_window(128, 22, anchor = NW, window = self.fnLabel)
+		self.savefileName = self.mainFrame.create_window(128, 52, anchor = NW, window = self.svLabel)
 		self.saveButton = self.mainFrame.create_window(22, 50, anchor = NW, window = self.svButton)
-		self.headerLabel = self.mainFrame.create_window(420, 22, anchor = NW, window = self.hdLabel)
-		self.headerEntry = self.mainFrame.create_window(520, 22, anchor = NW, window = self.hdEntry)
-		self.headerButton = self.mainFrame.create_window(570, 190, window = self.hdButton)
-		self.counterLabel = self.mainFrame.create_window(650, 220, anchor = E, window = self.countLabel)
+		self.headerLabel = self.mainFrame.create_window(514, 22, anchor = NE, window = self.hdLabel)
+		self.headerEntry = self.mainFrame.create_window(520, 20, anchor = NW, window = self.hdEntry)
+		self.headerButton = self.mainFrame.create_window(565, 188, window = self.hdButton)
+		self.counterLabel = self.mainFrame.create_window(664, 216, anchor = E, window = self.countLabel)
 		self.startButton = self.mainFrame.create_window(22, 200, anchor = NW, window = self.strtButton)
+		self.threadLabel = self.mainFrame.create_window(380, 22, anchor = NE, window=self.thLabel)
+		self.threadBox = self.mainFrame.create_window(420, 20, anchor = NE, window = self.thBox)
 		self.statusEntry = self.mainFrame.create_window(22, 230, anchor = NW, window = self.statLabel)
 
 	def openFile(self):
 		self.openFile = tkFileDialog.askopenfilename(filetypes = (('text files', '*.txt'),))
 		if self.openFile:
-			self.fnLabel.config(text = '...' + self.openFile.split('/')[-1])
+			self.fnLabel.config(text = '...\\' + self.openFile.split('/')[-1])
 			self.writeToLog('INPUT FILE OPEN: ' + self.openFile, 'NA')
 			self.scanFile(self.openFile)
 
@@ -100,10 +115,9 @@ class Main_Window(Frame):
 				if self.openOutputFile.split('.')[-1] != 'txt':
 					self.openOutputFile += '.txt'
 
-			self.svLabel.config(text = '...' + self.openOutputFile.split('/')[-1])
+			self.svLabel.config(text = '...\\' + self.openOutputFile.split('/')[-1])
 
 			print self.openOutputFile
-
 
 	def scanFile(self, file):
 		importCount = 0
@@ -114,17 +128,18 @@ class Main_Window(Frame):
 					mail = email.rstrip().split('@')
 					if len(mail) == 2:
 						if len(mail[-1].split('.')) >= 2:
+							host = mail[-1]
 							account = mail[0].split(' ')[-1]
 							self.writeToLog('Imported: ' + account + '@' + mail[-1], 'NA')
 							importCount += 1
 							if mail[-1] in self.emailDir:
 								#if domain already exists in the directory, add the additional account to the list. Only if it doesn't exist yet.
-								if not mail[0] in self.emailDir[mail[-1]][0]:
-									self.emailDir[mail[-1]][0].append(account)
+								if not mail[0] in self.emailDir[host][0]:
+									self.emailDir[host][0].append(account)
 									emailCount += 1
 							else:
 								#if account/domain doesn't exist add a directory entry
-								self.emailDir[mail[-1]] = ([account], [])
+								self.emailDir[host] = ([account], [])
 								emailCount += 1
 
 				except Exception:
@@ -138,7 +153,7 @@ class Main_Window(Frame):
 		if self.hdButtonTick.get():
 			self.addCustom()
 
-		self.writeToLog('Total emails recognised: ' + str(importCount) + ', total imported: ' + str(emailCount), 'OK')
+		self.writeToLog('Total e-mails recognised: ' + str(importCount) + ', total imported: ' + str(emailCount), 'OK')
 		print self.emailDir
 
 	def writeToLog(self, text, status):
@@ -161,6 +176,12 @@ class Main_Window(Frame):
 		#time.sleep(0.001)
 		self.master.update()
 
+	def clearLog(self):
+		self.log = []
+		self.statLabel.config(state=NORMAL)
+		self.statLabel.delete('1.0', END)
+		self.statLabel.config(state=DISABLED)
+
 	def addCustom(self):
 		queries = [x for x in self.hdEntry.get('1.0', END).split('\n') if x != '']
 
@@ -170,12 +191,16 @@ class Main_Window(Frame):
 					job.custom.append(query)
 
 	def runJobs(self):
-		self.fnButton.config(state=DISABLED)
-		self.hdButton.config(state=DISABLED)
-		self.strtButton.config(state=DISABLED)
-		self.hdEntry.config(state=DISABLED)
-
-
+		if Job.jobsList:
+			self.fnButton.config(state=DISABLED)
+			self.hdButton.config(state=DISABLED)
+			self.strtButton.config(state=DISABLED)
+			self.hdEntry.config(state=DISABLED)
+			self.thBox.config(state=DISABLED)
+			self.clearLog()
+			self.writeToLog('Batch e-mail verification process started.', 'OK')
+		else:
+			print self.boxValue.get()
 
 	def updateCounter(self, current, total):
 		self.countLabel.config(text = current + '/' + total)
