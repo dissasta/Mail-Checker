@@ -1,4 +1,6 @@
 from Tkinter import *
+from job import *
+from verifier import *
 import tkFileDialog
 import os
 import time
@@ -9,47 +11,19 @@ globFont = "Verdana 8 bold"
 logFolder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'LOGS')
 logFile = str(datetime.now().strftime('%Y-%m-%d %H.%M.%S')) + ' LOG.txt'
 
-class Verifier(object):
-	def __init__(self, id):
-		self.id = id
-		self.active = False
-		self.myJob = None
-
-	def getMXRecords(self):
-		pass
-
-	def connect(self):
-		pass
-
-class Job(object):
-	jobsList = []
-	jobsCount = 1
-	jobsResultsMain = []
-	jobsResultsCustom = []
-	jobsResultsMainFailed = []
-	jobsResultsCustomFailed = []
-
-	def __init__(self, host, accounts):
-		self.host = host
-		self.accounts = accounts
-		self.custom = []
-		self.done = False
-		self.id = Job.jobsCount
-		Job.jobsList.append(self)
-		Job.jobsCount += 1
-
-class Main_Window(Frame):
+class MainWindow(Frame):
 	if not os.path.exists(logFolder):
 		os.mkdir(logFolder)
 
 	def __init__(self, master):
-		Frame.__init__(self, master, relief=SUNKEN, bd=2)
+		Frame.__init__(self, master, bd=2)
 		self.master = master
 		self.hdEntryText = ''
 		self.hdButtonTick = BooleanVar()
 		self.boxValue = StringVar()
 		self.log = []
 		self.rows = 1
+		self.taskActive = False
 		self.emailDir = {}
 		self.createMenus()
 		self.createWindow()
@@ -67,10 +41,14 @@ class Main_Window(Frame):
 	def createWindow(self):
 		self.mainFrame = Canvas(width=680, height=400, bg="GREY")
 		self.mainFrame.pack()
-		self.fnButton = Button(self.mainFrame, text = 'Choose input file', width = 15, command=self.openFile)
-		self.svButton = Button(self.mainFrame, text = 'Choose output file', width = 15, command=self.openOutputFile)
-		self.svLabel = Label(self.mainFrame, text='...', background = 'GREY')
-		self.fnLabel = Label(self.mainFrame, text='...', background = 'GREY')
+		self.fnButton = Button(self.mainFrame, text = '...', width = 3, command=self.openFile)
+		self.svButton = Button(self.mainFrame, text = '...', width = 3, command=self.openOutputFile)
+		self.svLabel = Text(self.mainFrame, height = 1, width = 24, wrap="none")
+		self.fnLabel = Text(self.mainFrame, height = 1, width = 24, wrap="none")
+		self.fnLabel.insert('1.0', 'Choose input file')
+		self.fnLabel.config(state=DISABLED)
+		self.svLabel.insert('1.0', 'Choose output file')
+		self.svLabel.config(state=DISABLED)
 		self.hdLabel = Label(self.mainFrame, text='Custom queries:', background = 'GREY')
 		self.hdEntry = Text(self.mainFrame, height = 10, width = 20, background = '#424242', foreground = "#2195E7")
 		self.hdButton = Checkbutton(self.mainFrame, text="Exclusive Mode", variable=self.hdButtonTick, background = 'GREY')
@@ -85,11 +63,11 @@ class Main_Window(Frame):
 		self.statLabel.tag_config('WARN', foreground='RED')
 		self.statLabel.tag_config('NA', foreground='#2195E7')
 
-		self.fileButton = self.mainFrame.create_window(22, 20, anchor = NW, window = self.fnButton)
-		self.fileName = self.mainFrame.create_window(128, 22, anchor = NW, window = self.fnLabel)
-		self.savefileName = self.mainFrame.create_window(128, 52, anchor = NW, window = self.svLabel)
-		self.saveButton = self.mainFrame.create_window(22, 50, anchor = NW, window = self.svButton)
-		self.headerLabel = self.mainFrame.create_window(514, 22, anchor = NE, window = self.hdLabel)
+		self.fileButton = self.mainFrame.create_window(200, 20, anchor = NW, window = self.fnButton)
+		self.fileName = self.mainFrame.create_window(22, 22, anchor = NW, window = self.fnLabel)
+		self.savefileName = self.mainFrame.create_window(22, 52, anchor = NW, window = self.svLabel)
+		self.saveButton = self.mainFrame.create_window(200, 50, anchor = NW, window = self.svButton)
+		self.headerLabel = self.mainFrame.create_window(517, 22, anchor = NE, window = self.hdLabel)
 		self.headerEntry = self.mainFrame.create_window(520, 20, anchor = NW, window = self.hdEntry)
 		self.headerButton = self.mainFrame.create_window(565, 188, window = self.hdButton)
 		self.counterLabel = self.mainFrame.create_window(664, 216, anchor = E, window = self.countLabel)
@@ -101,7 +79,10 @@ class Main_Window(Frame):
 	def openFile(self):
 		self.openFile = tkFileDialog.askopenfilename(filetypes = (('text files', '*.txt'),))
 		if self.openFile:
-			self.fnLabel.config(text = '...\\' + self.openFile.split('/')[-1])
+			self.fnLabel.config(state=NORMAL)
+			self.fnLabel.delete('1.0', END)
+			self.fnLabel.insert('1.0', self.openFile)
+			self.fnLabel.config(state=DISABLED)
 			self.writeToLog('INPUT FILE OPEN: ' + self.openFile, 'NA')
 			self.scanFile(self.openFile)
 
@@ -115,7 +96,10 @@ class Main_Window(Frame):
 				if self.openOutputFile.split('.')[-1] != 'txt':
 					self.openOutputFile += '.txt'
 
-			self.svLabel.config(text = '...\\' + self.openOutputFile.split('/')[-1])
+			self.svLabel.config(state=NORMAL)
+			self.svLabel.delete('1.0', END)
+			self.svLabel.insert('1.0', self.openOutputFile)
+			self.svLabel.config(state=DISABLED)
 
 			print self.openOutputFile
 
@@ -192,6 +176,7 @@ class Main_Window(Frame):
 
 	def runJobs(self):
 		if Job.jobsList:
+			self.taskActive = True
 			self.fnButton.config(state=DISABLED)
 			self.hdButton.config(state=DISABLED)
 			self.strtButton.config(state=DISABLED)
@@ -199,8 +184,28 @@ class Main_Window(Frame):
 			self.thBox.config(state=DISABLED)
 			self.clearLog()
 			self.writeToLog('Batch e-mail verification process started.', 'OK')
+
+			#for i in range(int(self.thBox.get())):
+			#	Verifier(i + 1)
+			while self.taskActive:
+
+				for job in Job.jobsList:
+					while len(Verifier.threads) >= int(self.thBox.get()):
+						pass
+
+					if Verifier.threads < int(self.thBox.get()):
+						Verifier()
+
+					if not job.done:
+
+			#while self.jobActive:
+
+				#print len(Job.jobsList)
+				#for job in Job.jobsList:
+					#verifier.doSomething(job, self)
+
 		else:
-			print self.boxValue.get()
+			pass
 
 	def updateCounter(self, current, total):
 		self.countLabel.config(text = current + '/' + total)
@@ -211,23 +216,9 @@ class Main_Window(Frame):
 		log.write(text + '\n')
 		log.close()
 
-	def saveToFile(self):
-		f = tkFileDialog.asksaveasfile(mode='w', defaultextension=".stk")
-		if f is None: # asksaveasfile return `None` if dialog closed with "cancel".
-			return
-		allInputs = []
-
-		count = 0
-		for i in Item.items:
-			allInputs.append([])
-			for x in i.inputs:
-				allInputs[count].append(x.entry.get())
-			count += 1
-
-
 if __name__ == '__main__':
 	root = Tk()
-	app = Main_Window(root)
+	app = MainWindow(root)
 	app.master.title('E-mail Verifier')
 	app.pack()
 	root.update()
@@ -236,6 +227,7 @@ if __name__ == '__main__':
 	root.minsize(root.winfo_width(), root.winfo_height())
 	root.resizable(False, False)
 	app.mainloop()
+
 	try:
 		root.destroy()
 	except:
