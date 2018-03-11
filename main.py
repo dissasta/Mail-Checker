@@ -1,10 +1,14 @@
+# -*- coding: utf-8 -*-
 from Tkinter import *
 from job import *
 from verifier import *
 import tkFileDialog
 import os
+import sys
+import codecs
 import time
 import ttk
+import threading
 from datetime import datetime
 
 globFont = "Verdana 8 bold"
@@ -21,10 +25,15 @@ class MainWindow(Frame):
 		self.hdEntryText = ''
 		self.hdButtonTick = BooleanVar()
 		self.boxValue = StringVar()
+		self.totalCount = 0
+		self.customCount = 0
 		self.log = []
+		self.verifierLog = []
 		self.rows = 1
 		self.taskActive = False
+		self.after(1, self.updateMainStates)
 		self.emailDir = {}
+		self.lock = threading.Lock()
 		self.createMenus()
 		self.createWindow()
 
@@ -52,7 +61,7 @@ class MainWindow(Frame):
 		self.hdLabel = Label(self.mainFrame, text='Custom queries:', background = 'GREY')
 		self.hdEntry = Text(self.mainFrame, height = 10, width = 20, background = '#424242', foreground = "#2195E7")
 		self.hdButton = Checkbutton(self.mainFrame, text="Exclusive Mode", variable=self.hdButtonTick, background = 'GREY')
-		self.countLabel = Label(self.mainFrame, text='1 / 1000', background = 'GREY')
+		self.countLabel = Label(self.mainFrame, text='0 / 0', background = 'GREY')
 		self.strtButton = Button(self.mainFrame, text= "START", width = 8, command=self.runJobs)
 		self.thLabel = Label(self.mainFrame, text='Threads:', background='GREY')
 		self.thBox = ttk.Combobox(self.mainFrame, width = 2, textvariable = self.boxValue)
@@ -103,39 +112,115 @@ class MainWindow(Frame):
 
 			print self.openOutputFile
 
+	def updateMainStates(self):
+		#to screen log printing logic
+		if self.verifierLog:
+			self.statLabel.config(state=NORMAL)
+			self.statLabel.delete('1.0', END)
+			if len(self.verifierLog) >= 11:
+
+				#self.logToFile(text)
+
+				for i in range(10):
+
+					if i == 9:
+						self.statLabel.insert(END, self.verifierLog[i][0], self.verifierLog[i][1])
+
+					else:
+						self.statLabel.insert(END, self.verifierLog[i][0] + '\n', self.verifierLog[i][1])
+
+				self.statLabel.config(state=DISABLED)
+				self.verifierLog.pop(0)
+
+			else:
+				for i in range(len(self.verifierLog)):
+					self.statLabel.insert(END, self.verifierLog[i][0]  + '\n', self.verifierLog[i][1])
+
+			self.statLabel.config(state=DISABLED)
+
+		#job count label update
+		if self.hdButtonTick.get():
+			finalCounter = self.customCount
+		else:
+			finalCounter = self.totalCount + self.customCount
+
+		self.countLabel.config(text=str(Verifier.verified) + ' / ' + str(finalCounter))
+
+		# activating/deactivating logic for threads
+		if self.taskActive:
+			if Job.jobsList:
+
+				activeThreads = 0
+				for thread in Verifier.threads:
+					if thread.active:
+						activeThreads += 1
+
+				if activeThreads > int(self.thBox.get()):
+					toKeep = range(1, (activeThreads - (activeThreads - int(self.thBox.get()))) + 1)
+					for thread in Verifier.threads:
+						if thread.id in toKeep:
+							pass
+						else:
+							thread.active = False
+
+				elif activeThreads < int(self.thBox.get()):
+					toActivate = range(activeThreads + 1, int(self.thBox.get()) + 1)
+					for thread in Verifier.threads:
+						if thread.id in toActivate:
+							thread.active = True
+			else:
+				self.taskActive = False
+		else:
+			self.fnButton.config(state=NORMAL)
+			self.hdButton.config(state=NORMAL)
+			self.strtButton.config(state=NORMAL)
+			self.hdEntry.config(state=NORMAL)
+		#print len(self.verifierLog)
+		self.after(1, self.updateMainStates)
+
 	def scanFile(self, file):
 		importCount = 0
 		emailCount = 0
-		with open(file, 'r') as plik:
+		reload(sys)
+		sys.setdefaultencoding("windows-1250")
+		with codecs.open(file, 'r', "windows-1250") as plik:
 			for email in plik.readlines():
 				try:
-					mail = email.rstrip().split('@')
+					mail = email.encode('utf-8').rstrip().split('@')
 					if len(mail) == 2:
 						if len(mail[-1].split('.')) >= 2:
 							host = mail[-1]
 							account = mail[0].split(' ')[-1]
 							self.writeToLog('Imported: ' + account + '@' + mail[-1], 'NA')
 							importCount += 1
-							if mail[-1] in self.emailDir:
+
+							if host in self.emailDir:
 								#if domain already exists in the directory, add the additional account to the list. Only if it doesn't exist yet.
-								if not mail[0] in self.emailDir[host][0]:
-									self.emailDir[host][0].append(account)
+								if not account in self.emailDir[host]:
+									self.emailDir[host].append(account)
 									emailCount += 1
+									self.totalCount = emailCount
+
 							else:
 								#if account/domain doesn't exist add a directory entry
-								self.emailDir[host] = ([account], [])
+								self.emailDir[host] = [account]
 								emailCount += 1
+								self.totalCount = emailCount
 
 				except Exception:
-					print 'something went wrong'
+					print 'wrong encoding'
 
 		Job.jobsList = []
 
 		for i in self.emailDir:
-			Job(i, self.emailDir[i][0])
+			Job(i, self.emailDir[i])
 
-		if self.hdButtonTick.get():
-			self.addCustom()
+		count = 0
+
+		for i in Job.jobsList:
+			for n in i.accounts:
+				print n
+				count += 1
 
 		self.writeToLog('Total e-mails recognised: ' + str(importCount) + ', total imported: ' + str(emailCount), 'OK')
 		print self.emailDir
@@ -150,6 +235,7 @@ class MainWindow(Frame):
 		self.statLabel.config(state=NORMAL)
 		self.statLabel.delete('1.0', END)
 		for i in range(len(self.log)):
+
 			if i == 9:
 				self.statLabel.insert(END, self.log[i][0], self.log[i][1])
 
@@ -157,7 +243,7 @@ class MainWindow(Frame):
 				self.statLabel.insert(END, self.log[i][0] + '\n', self.log[i][1])
 
 		self.statLabel.config(state=DISABLED)
-		#time.sleep(0.001)
+		print len(self.log)
 		self.master.update()
 
 	def clearLog(self):
@@ -168,11 +254,16 @@ class MainWindow(Frame):
 
 	def addCustom(self):
 		queries = [x for x in self.hdEntry.get('1.0', END).split('\n') if x != '']
+		print queries
+		if queries:
+			self.writeToLog('Adding custom queries to jobs', 'OK')
 
-		for job in Job.jobsList:
-			for query in queries:
-				if not query in job.accounts:
-					job.custom.append(query)
+			for job in Job.jobsList:
+				for query in queries:
+					if not query in job.accounts and not query in job.custom:
+						self.customCount += 1
+						self.writeToLog('Adding ' + query + '@' + job.host, 'NA')
+						job.custom.append(query)
 
 	def runJobs(self):
 		if Job.jobsList:
@@ -181,35 +272,14 @@ class MainWindow(Frame):
 			self.hdButton.config(state=DISABLED)
 			self.strtButton.config(state=DISABLED)
 			self.hdEntry.config(state=DISABLED)
-			self.thBox.config(state=DISABLED)
+			#self.thBox.config(state=DISABLED)
 			self.clearLog()
+			self.addCustom()
 			self.writeToLog('Batch e-mail verification process started.', 'OK')
-
-			#for i in range(int(self.thBox.get())):
-			#	Verifier(i + 1)
-			while self.taskActive:
-
-				for job in Job.jobsList:
-					while len(Verifier.threads) >= int(self.thBox.get()):
-						pass
-
-					if Verifier.threads < int(self.thBox.get()):
-						Verifier()
-
-					if not job.done:
-
-			#while self.jobActive:
-
-				#print len(Job.jobsList)
-				#for job in Job.jobsList:
-					#verifier.doSomething(job, self)
-
-		else:
-			pass
-
-	def updateCounter(self, current, total):
-		self.countLabel.config(text = current + '/' + total)
-		self.master.update()
+			for i in range(1, 7):
+				thread = Verifier(i, self)
+				thread.start()
+				time.sleep(0.1)
 
 	def logToFile(self, text):
 		log = open(os.path.join(logFolder, logFile), 'a')

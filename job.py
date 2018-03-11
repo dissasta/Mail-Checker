@@ -11,6 +11,7 @@ class Job(object):
 		self.accounts = accounts
 		self.custom = []
 		self.done = False
+		self.active = False
 		self.id = Job.jobsCount
 		Job.jobsList.append(self)
 		Job.jobsCount += 1

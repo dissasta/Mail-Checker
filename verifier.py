@@ -1,8 +1,13 @@
-class Verifier(object):
-    active = []
+import threading
+import time
+from job import *
+class Verifier(threading.Thread):
     threads = []
-    def __init__(self):
-        self.id = self.getId()
+    verified = 0
+    def __init__(self, id, master):
+        threading.Thread.__init__(self)
+        self.master = master
+        self.id = id
         self.active = False
         self.myJob = None
         self.quit = False
@@ -14,39 +19,25 @@ class Verifier(object):
     def connect(self):
         pass
 
-    def getId(self):
-        threads = []
-        for verifier in Verifier.threads:
-            threads.append(verifier.id)
+    def run(self):
+        while True:
+            while self.active and self.master.taskActive:
+                if Job.jobsList:
+                    job = Job.jobsList.pop(0)
+                    if not self.master.hdButtonTick.get():
+                        for i in job.accounts:
+                            time.sleep(0.05)
+                            self.master.lock.acquire()
+                            self.master.verifierLog.append(('THREAD-' + str(self.id) + ' ' + i + '@' + job.host, 'OK'))
+                            Verifier.verified += 1
+                            self.master.lock.release()
 
-        threads = sorted(threads)
-
-        if len(threads) == 0:
-            return 1
-
-        elif len(threads) == 1:
-            if threads[0] - 1 != 0:
-                return 1
-            else:
-                return 2
-        else:
-            numGaps = False
-            for i in range(len(threads) - 1):
-                if threads[i + 1] - threads[i] == 1:
-                    pass
+                    for i in job.custom:
+                        time.sleep(0.05)
+                        self.master.lock.acquire()
+                        self.master.verifierLog.append(('THREAD-' + str(self.id) + ' ' + i + '@' + job.host, 'OK'))
+                        Verifier.verified += 1
+                        self.master.lock.release()
                 else:
-                    numGaps = True
-                    return threads[i] + 1
-
-            if not numGaps:
-                return threads[-1] + 1
-
-    def doSomething(self, job, master):
-        self.myJob = job
-        self.active = True
-        for account in self.myJob.accounts:
-            master.writeToLog('Thread-' + str(self.id) + ': ' + account + '@' + self.myJob.host + str(self.myJob.id), 'OK')
-
-        for account in self.myJob.custom:
-            master.writeToLog('Thread-' + str(self.id) + ': ' + account + '@' + self.myJob.host , str(self.myJob.id), 'OK')
+                    self.active = False
 
