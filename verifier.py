@@ -21,23 +21,39 @@ class Verifier(threading.Thread):
 
     def run(self):
         while True:
-            while self.active and self.master.taskActive:
-                if Job.jobsList:
-                    job = Job.jobsList.pop(0)
-                    if not self.master.hdButtonTick.get():
-                        for i in job.accounts:
-                            time.sleep(0.05)
+            while self.active:
+                if self.master.taskActive:
+                    self.master.lock.acquire()
+                    if Job.jobsList:
+                        job = Job.jobsList.pop(0)
+                        self.master.lock.release()
+
+                        if not self.master.hdButtonTick.get():
+                            for i in job.accounts:
+                                email = i + '@' + job.host
+                                time.sleep(0.2)
+                                self.master.lock.acquire()
+                                self.master.verifierLog.append(('THREAD-' + str(self.id) + ' ' + email, 'OK'))
+                                if Verifier.verified % 20 == 0:
+                                    Job.jobsResultsMainFailed.append(email)
+                                else:
+                                    Job.jobsResultsMain.append(email)
+                                Verifier.verified += 1
+                                self.master.lock.release()
+
+                        for i in job.custom:
+                            email = i + '@' + job.host
+                            time.sleep(0.2)
                             self.master.lock.acquire()
-                            self.master.verifierLog.append(('THREAD-' + str(self.id) + ' ' + i + '@' + job.host, 'OK'))
+                            self.master.verifierLog.append(('THREAD-' + str(self.id) + ' ' + email, 'OK'))
+                            if Verifier.verified % 500:
+                                Job.jobsResultsCustomFailed.append(email)
+                            else:
+                                Job.jobsResultsCustom.append(email)
                             Verifier.verified += 1
                             self.master.lock.release()
-
-                    for i in job.custom:
-                        time.sleep(0.05)
-                        self.master.lock.acquire()
-                        self.master.verifierLog.append(('THREAD-' + str(self.id) + ' ' + i + '@' + job.host, 'OK'))
-                        Verifier.verified += 1
+                    else:
                         self.master.lock.release()
+                        self.active = False
                 else:
                     self.active = False
-

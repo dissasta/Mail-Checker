@@ -44,7 +44,7 @@ class MainWindow(Frame):
 		menu.add_command(label="Exit", command=self.quit)
 		menu.add_command(label="Open File", command=self.openFile)
 		#self.menubar.add_command(label="Add Format", command=lambda: Item(master, ['', 'text1', ''], 3))
-		self.menubar.add_command(label="Generate .STK", command=(lambda: self.saveToFile()))
+		#self.menubar.add_command(label="Generate .STK", command=(lambda: self.saveToFile()))
 		self.master.config(menu=self.menubar)
 
 	def createWindow(self):
@@ -62,11 +62,12 @@ class MainWindow(Frame):
 		self.hdEntry = Text(self.mainFrame, height = 10, width = 20, background = '#424242', foreground = "#2195E7")
 		self.hdButton = Checkbutton(self.mainFrame, text="Exclusive Mode", variable=self.hdButtonTick, background = 'GREY')
 		self.countLabel = Label(self.mainFrame, text='0 / 0', background = 'GREY')
-		self.strtButton = Button(self.mainFrame, text= "START", width = 8, command=self.runJobs)
+		self.strtButton = Button(self.mainFrame, text= "START", width = 8, command=self.runJobs, state=DISABLED)
 		self.thLabel = Label(self.mainFrame, text='Threads:', background='GREY')
 		self.thBox = ttk.Combobox(self.mainFrame, width = 2, textvariable = self.boxValue)
 		self.thBox['values'] = (1, 2, 3, 4, 5, 6)
 		self.thBox.current(0)
+		self.exButton = Button(self.mainFrame, text = 'EXPORT', width = 8, command=self.exportOutputFile, state=DISABLED)
 		self.statLabel = Text(self.mainFrame, height = 10, width = 91, background = '#424242', state=DISABLED)
 		self.statLabel.tag_config('OK', foreground='GREEN')
 		self.statLabel.tag_config('WARN', foreground='RED')
@@ -84,6 +85,20 @@ class MainWindow(Frame):
 		self.threadLabel = self.mainFrame.create_window(380, 22, anchor = NE, window=self.thLabel)
 		self.threadBox = self.mainFrame.create_window(420, 20, anchor = NE, window = self.thBox)
 		self.statusEntry = self.mainFrame.create_window(22, 230, anchor = NW, window = self.statLabel)
+		self.exportButton = self.mainFrame.create_window(22, 82, anchor = NW, window = self.exButton)
+
+	def exportOutputFile(self):
+		for i in Job.jobsResultsMain:
+			print 'good results main: ' + i
+
+		for i in Job.jobsResultsMainFailed:
+			print 'failed results main: ' + i
+
+		for i in Job.jobsResultsCustom:
+			print 'good results custom: ' + i
+
+		for i in Job.jobsResultsCustomFailed:
+			print 'failed results custom: ' + i
 
 	def openFile(self):
 		self.openFile = tkFileDialog.askopenfilename(filetypes = (('text files', '*.txt'),))
@@ -146,6 +161,32 @@ class MainWindow(Frame):
 
 		self.countLabel.config(text=str(Verifier.verified) + ' / ' + str(finalCounter))
 
+		#update button states
+		if Job.jobsList and not self.taskActive:
+			self.strtButton.config(state=NORMAL)
+
+		elif not Job.jobsList and not self.taskActive:
+			self.strtButton.config(state=DISABLED)
+
+		elif self.taskActive:
+			self.strtButton.config(state=DISABLED)
+
+		else:
+			self.strtButton.config(state=NORMAL)
+
+		any = False
+
+		for i in Job.jobsAllResults:
+			if i:
+				any = True
+				break
+
+		if any and not self.taskActive:
+			self.exButton.config(state=NORMAL)
+
+		else:
+			self.exButton.config(state=DISABLED)
+
 		# activating/deactivating logic for threads
 		if self.taskActive:
 			if Job.jobsList:
@@ -173,14 +214,19 @@ class MainWindow(Frame):
 		else:
 			self.fnButton.config(state=NORMAL)
 			self.hdButton.config(state=NORMAL)
-			self.strtButton.config(state=NORMAL)
 			self.hdEntry.config(state=NORMAL)
-		#print len(self.verifierLog)
-		self.after(1, self.updateMainStates)
+
+		self.after(10, self.updateMainStates)
 
 	def scanFile(self, file):
+		print 'scanning'
 		importCount = 0
 		emailCount = 0
+		self.verifierLog = []
+		if not Job.jobsList:
+			self.totalCount = 0
+			self.customCount = 0
+			Verifier.verified = 0
 		reload(sys)
 		sys.setdefaultencoding("windows-1250")
 		with codecs.open(file, 'r', "windows-1250") as plik:
@@ -193,19 +239,16 @@ class MainWindow(Frame):
 							account = mail[0].split(' ')[-1]
 							self.writeToLog('Imported: ' + account + '@' + mail[-1], 'NA')
 							importCount += 1
-
 							if host in self.emailDir:
 								#if domain already exists in the directory, add the additional account to the list. Only if it doesn't exist yet.
 								if not account in self.emailDir[host]:
 									self.emailDir[host].append(account)
-									emailCount += 1
-									self.totalCount = emailCount
+									self.totalCount += 1
 
 							else:
 								#if account/domain doesn't exist add a directory entry
 								self.emailDir[host] = [account]
-								emailCount += 1
-								self.totalCount = emailCount
+								self.totalCount += 1
 
 				except Exception:
 					print 'wrong encoding'
@@ -214,13 +257,6 @@ class MainWindow(Frame):
 
 		for i in self.emailDir:
 			Job(i, self.emailDir[i])
-
-		count = 0
-
-		for i in Job.jobsList:
-			for n in i.accounts:
-				print n
-				count += 1
 
 		self.writeToLog('Total e-mails recognised: ' + str(importCount) + ', total imported: ' + str(emailCount), 'OK')
 		print self.emailDir
@@ -243,7 +279,6 @@ class MainWindow(Frame):
 				self.statLabel.insert(END, self.log[i][0] + '\n', self.log[i][1])
 
 		self.statLabel.config(state=DISABLED)
-		print len(self.log)
 		self.master.update()
 
 	def clearLog(self):
@@ -262,24 +297,30 @@ class MainWindow(Frame):
 				for query in queries:
 					if not query in job.accounts and not query in job.custom:
 						self.customCount += 1
+						time.sleep(0.01)
 						self.writeToLog('Adding ' + query + '@' + job.host, 'NA')
 						job.custom.append(query)
 
 	def runJobs(self):
 		if Job.jobsList:
-			self.taskActive = True
+			Verifier.verified = 0
+			self.emailDir = {}
+			self.clearLog()
+			Job.clearResults()
 			self.fnButton.config(state=DISABLED)
 			self.hdButton.config(state=DISABLED)
 			self.strtButton.config(state=DISABLED)
 			self.hdEntry.config(state=DISABLED)
-			#self.thBox.config(state=DISABLED)
-			self.clearLog()
 			self.addCustom()
 			self.writeToLog('Batch e-mail verification process started.', 'OK')
-			for i in range(1, 7):
-				thread = Verifier(i, self)
-				thread.start()
-				time.sleep(0.1)
+
+			self.taskActive = True
+
+			if not Verifier.threads:
+				for i in range(1, 7):
+					thread = Verifier(i, self)
+					thread.start()
+					time.sleep(0.3)
 
 	def logToFile(self, text):
 		log = open(os.path.join(logFolder, logFile), 'a')

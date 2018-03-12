@@ -5,6 +5,7 @@ class Job(object):
 	jobsResultsCustom = []
 	jobsResultsMainFailed = []
 	jobsResultsCustomFailed = []
+	jobsAllResults = [jobsResultsMain, jobsResultsCustom, jobsResultsMainFailed, jobsResultsCustomFailed]
 
 	def __init__(self, host, accounts):
 		self.host = host
@@ -15,3 +16,11 @@ class Job(object):
 		self.id = Job.jobsCount
 		Job.jobsList.append(self)
 		Job.jobsCount += 1
+
+	@staticmethod
+	def clearResults():
+		Job.jobsResultsMain = []
+		Job.jobsResultsCustom = []
+		Job.jobsResultsMainFailed = []
+		Job.jobsResultsCustomFailed = []
+		Job.jobsAllResults = [Job.jobsResultsMain, Job.jobsResultsCustom, Job.jobsResultsMainFailed, Job.jobsResultsCustomFailed]
