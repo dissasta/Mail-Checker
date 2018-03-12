@@ -298,7 +298,7 @@ class MainWindow(Frame):
 					if not query in job.accounts and not query in job.custom:
 						self.customCount += 1
 						time.sleep(0.01)
-						self.writeToLog('Adding ' + query + '@' + job.host, 'NA')
+						self.writeToLog('Added: ' + query + '@' + job.host, 'NA')
 						job.custom.append(query)
 
 	def runJobs(self):
