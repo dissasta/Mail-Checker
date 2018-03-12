@@ -33,7 +33,7 @@ class Verifier(threading.Thread):
                                 email = i + '@' + job.host
                                 time.sleep(0.2)
                                 self.master.lock.acquire()
-                                self.master.verifierLog.append(('TH-' + str(self.id) + ' ' + email, 'OK'))
+                                self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + email, 'OK'))
                                 if Verifier.verified % 20 == 0:
                                     Job.jobsResultsMainFailed.append(email)
                                 else:
@@ -45,7 +45,7 @@ class Verifier(threading.Thread):
                             email = i + '@' + job.host
                             time.sleep(0.2)
                             self.master.lock.acquire()
-                            self.master.verifierLog.append(('TH-' + str(self.id) + ' ' + email, 'OK'))
+                            self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + email, 'OK'))
                             if Verifier.verified % 500:
                                 Job.jobsResultsCustomFailed.append(email)
                             else:
