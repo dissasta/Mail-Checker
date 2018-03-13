@@ -1,9 +1,12 @@
 import threading
 import time
+import os
 from job import *
 class Verifier(threading.Thread):
     threads = []
     verified = 0
+    notExistingHosts = 0
+    existingHosts = 0
     def __init__(self, id, master):
         threading.Thread.__init__(self)
         self.master = master
@@ -26,6 +29,23 @@ class Verifier(threading.Thread):
                     self.master.lock.acquire()
                     if Job.jobsList:
                         job = Job.jobsList.pop(0)
+
+                        lookup = os.popen('nslookup -q=mx ' + job.host).readlines()
+
+                        lookup = [x.rstrip() for x in lookup if 'exchanger' in x]
+
+                        mxList = []
+
+                        for i in lookup:
+                            line = i.split(',')
+                            mxList.append((line[0].split('=')[-1].strip(), line[1].split('=')[-1].strip()))
+
+                        if mxList:
+                            Verifier.existingHosts += 1
+                        else:
+                            Verifier.notExistingHosts += 1
+
+                        print job.host, sorted(mxList)
                         self.master.lock.release()
 
                         if not self.master.hdButtonTick.get():
@@ -57,3 +77,5 @@ class Verifier(threading.Thread):
                         self.active = False
                 else:
                     self.active = False
+                    print Verifier.existingHosts
+                    print Verifier.notExistingHosts

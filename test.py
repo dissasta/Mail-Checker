@@ -1,25 +1,16 @@
-threads = [1, 2, 3, 4, 5, 6, 7, 8]
+import os
 
-threads = sorted(threads)
-if len(threads) == 0:
-    print 1
+host = 'umig.miastko.pl'
 
-elif len(threads) == 1:
-    if threads[0] - 1 != 0:
-        print 1
-    else:
-        print 2
+server = os.popen('nslookup -q=mx ' + host).readlines()
+print server
+server = [x.rstrip() for x in server if 'exchanger' in x]
 
-else:
-    numGaps = False
-    for i in range(len(threads) - 1):
-        print 'number: ' + str(i)
-        if threads[i + 1] - threads[i] == 1:
-            print 'pass'
-            pass
-        else:
-            numGaps = True
-            print threads[i] + 1
+mx_list = []
 
-    if not numGaps:
-        print threads[-1] + 1
+for i in server:
+    line = i.split(',')
+    mx_list.append((line[0].split('=')[-1].strip(), line[1].split('=')[-1].strip()))
+
+print sorted(mx_list)
+
