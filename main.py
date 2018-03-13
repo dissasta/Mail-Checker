@@ -65,7 +65,7 @@ class MainWindow(Frame):
 		self.strtButton = Button(self.mainFrame, text= "START", width = 8, command=self.runJobs, state=DISABLED)
 		self.thLabel = Label(self.mainFrame, text='Threads:', background='GREY')
 		self.thBox = ttk.Combobox(self.mainFrame, width = 2, textvariable = self.boxValue)
-		self.thBox['values'] = (1, 2, 3, 4, 5, 6,7,8,9,10,11,12,13,14)
+		self.thBox['values'] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 		self.thBox.current(0)
 		self.exButton = Button(self.mainFrame, text = 'EXPORT', width = 8, command=self.exportOutputFile, state=DISABLED)
 		self.statLabel = Text(self.mainFrame, height = 10, width = 91, background = '#424242', state=DISABLED)
@@ -209,7 +209,6 @@ class MainWindow(Frame):
 					for thread in Verifier.threads:
 						if thread.id in toActivate:
 							thread.active = True
-							time.sleep(0.2)
 			else:
 				self.taskActive = False
 		else:
@@ -217,10 +216,9 @@ class MainWindow(Frame):
 			self.hdButton.config(state=NORMAL)
 			self.hdEntry.config(state=NORMAL)
 
-		self.after(10, self.updateMainStates)
+		self.after(100, self.updateMainStates)
 
 	def scanFile(self, file):
-		print 'scanning'
 		importCount = 0
 		emailCount = 0
 		self.verifierLog = []
@@ -314,14 +312,14 @@ class MainWindow(Frame):
 			self.hdEntry.config(state=DISABLED)
 			self.addCustom()
 			self.writeToLog('Batch e-mail verification process started.', 'OK')
-
+			self.writeToLog('INIT Threads.', 'OK')
 			self.taskActive = True
 
 			if not Verifier.threads:
-				for i in range(1, 15):
+				for i in range(1, 11):
 					thread = Verifier(i, self)
 					thread.start()
-					time.sleep(0.1)
+					time.sleep(0.3)
 
 	def logToFile(self, text):
 		log = open(os.path.join(logFolder, logFile), 'a')
