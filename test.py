@@ -49,6 +49,7 @@ def main():
 
                     if greeted:
                         for account in accounts:
+                            print account
                             time.sleep(1)
                             if not mailFrom:
                                 conn.write('MAIL from: me@my.com'.encode('ascii') + b"\n")
@@ -65,6 +66,7 @@ def main():
                             if mailFrom:
                                 conn.write('RCPT to: ' + account + '@cdkadr.pl'.encode('ascii') + b"\n")
                                 reply = conn.read_until('\n')
+                                print account, reply
                                 if '250' in reply:
                                     #print '3',reply
                                     replies.append(account)

@@ -11,9 +11,18 @@ class Job(object):
 		self.host = host
 		self.accounts = accounts
 		self.custom = []
+		self.mx = []
 		self.done = False
 		self.active = False
 		self.id = Job.jobsCount
+		self.connected = False
+		self.status = None
+		self.mxServer = None
+		self.greeted = False
+		self.mailFrom = False
+		self.replies = []
+		self.relayAllowed = True
+
 		Job.jobsList.append(self)
 		Job.jobsCount += 1
 

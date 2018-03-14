@@ -69,9 +69,10 @@ class MainWindow(Frame):
 		self.thBox.current(0)
 		self.exButton = Button(self.mainFrame, text = 'EXPORT', width = 8, command=self.exportOutputFile, state=DISABLED)
 		self.statLabel = Text(self.mainFrame, height = 10, width = 91, background = '#424242', state=DISABLED)
-		self.statLabel.tag_config('OK', foreground='GREEN')
-		self.statLabel.tag_config('WARN', foreground='RED')
+		self.statLabel.tag_config('OK', foreground='#08a83a')
+		self.statLabel.tag_config('FAIL', foreground='#c61111')
 		self.statLabel.tag_config('NA', foreground='#2195E7')
+		self.statLabel.tag_config('IN', foreground='#ce8b0e')
 
 		self.fileButton = self.mainFrame.create_window(200, 20, anchor = NW, window = self.fnButton)
 		self.fileName = self.mainFrame.create_window(22, 22, anchor = NW, window = self.fnLabel)
@@ -243,11 +244,13 @@ class MainWindow(Frame):
 								if not account in self.emailDir[host]:
 									self.emailDir[host].append(account)
 									self.totalCount += 1
+									emailCount += 1
 
 							else:
 								#if account/domain doesn't exist add a directory entry
 								self.emailDir[host] = [account]
 								self.totalCount += 1
+								emailCount += 1
 
 				except Exception:
 					print 'wrong encoding'
@@ -296,7 +299,6 @@ class MainWindow(Frame):
 				for query in queries:
 					if not query in job.accounts and not query in job.custom:
 						self.customCount += 1
-						#time.sleep(0.01)
 						self.writeToLog('Added: ' + query + '@' + job.host, 'NA')
 						job.custom.append(query)
 
