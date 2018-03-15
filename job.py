@@ -22,6 +22,7 @@ class Job(object):
 		self.mailFrom = False
 		self.replies = []
 		self.relayAllowed = True
+		self.serverResponsive = None
 
 		Job.jobsList.append(self)
 		Job.jobsCount += 1

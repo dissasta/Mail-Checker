@@ -50,7 +50,7 @@ def main():
                     if greeted:
                         for account in accounts:
                             print account
-                            time.sleep(1)
+                            time.sleep(5)
                             if not mailFrom:
                                 conn.write('MAIL from: me@my.com'.encode('ascii') + b"\n")
                                 reply = conn.read_until('\n')

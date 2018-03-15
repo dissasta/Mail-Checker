@@ -70,7 +70,7 @@ class MainWindow(Frame):
 		self.exButton = Button(self.mainFrame, text = 'EXPORT', width = 8, command=self.exportOutputFile, state=DISABLED)
 		self.statLabel = Text(self.mainFrame, height = 10, width = 91, background = '#424242', state=DISABLED)
 		self.statLabel.tag_config('OK', foreground='#08a83a')
-		self.statLabel.tag_config('FAIL', foreground='#c61111')
+		self.statLabel.tag_config('FAIL', foreground='#ff4444')
 		self.statLabel.tag_config('NA', foreground='#2195E7')
 		self.statLabel.tag_config('IN', foreground='#ce8b0e')
 
@@ -210,8 +210,14 @@ class MainWindow(Frame):
 					for thread in Verifier.threads:
 						if thread.id in toActivate:
 							thread.active = True
+
 			else:
-				self.taskActive = False
+				activeThreads = 0
+				for thread in Verifier.threads:
+					if thread.active:
+						activeThreads += 1
+				if not activeThreads:
+					self.taskActive = False
 		else:
 			self.fnButton.config(state=NORMAL)
 			self.hdButton.config(state=NORMAL)
@@ -242,13 +248,13 @@ class MainWindow(Frame):
 							if host in self.emailDir:
 								#if domain already exists in the directory, add the additional account to the list. Only if it doesn't exist yet.
 								if not account in self.emailDir[host]:
-									self.emailDir[host].append(account)
+									self.emailDir[host].append([account, 'main', None])
 									self.totalCount += 1
 									emailCount += 1
 
 							else:
 								#if account/domain doesn't exist add a directory entry
-								self.emailDir[host] = [account]
+								self.emailDir[host] = [[account, 'main', None]]
 								self.totalCount += 1
 								emailCount += 1
 
@@ -290,17 +296,20 @@ class MainWindow(Frame):
 		self.statLabel.config(state=DISABLED)
 
 	def addCustom(self):
-		queries = [x for x in self.hdEntry.get('1.0', END).split('\n') if x != '']
-		print queries
+		queries = set([x for x in self.hdEntry.get('1.0', END).split('\n') if x != ''])
 		if queries:
 			self.writeToLog('Adding custom queries to jobs', 'OK')
-
+			print queries
 			for job in Job.jobsList:
 				for query in queries:
-					if not query in job.accounts and not query in job.custom:
+					print query
+					#query = query.decode('utf-8')
+
+					if not (query, 'main', None) in job.accounts:
 						self.customCount += 1
 						self.writeToLog('Added: ' + query + '@' + job.host, 'NA')
-						job.custom.append(query)
+						job.accounts.append([query, 'custom', None])
+						print job.accounts
 
 	def runJobs(self):
 		if Job.jobsList:
@@ -308,14 +317,14 @@ class MainWindow(Frame):
 			self.emailDir = {}
 			self.clearLog()
 			Job.clearResults()
-			self.fnButton.config(state=DISABLED)
-			self.hdButton.config(state=DISABLED)
-			self.strtButton.config(state=DISABLED)
-			self.hdEntry.config(state=DISABLED)
 			self.addCustom()
 			self.writeToLog('Batch e-mail verification process started.', 'OK')
 			self.writeToLog('INIT Threads.', 'OK')
 			self.taskActive = True
+			self.fnButton.config(state=DISABLED)
+			self.hdButton.config(state=DISABLED)
+			self.strtButton.config(state=DISABLED)
+			self.hdEntry.config(state=DISABLED)
 
 			if not Verifier.threads:
 				for i in range(1, 11):
