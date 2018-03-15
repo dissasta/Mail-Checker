@@ -137,6 +137,10 @@ class Verifier(threading.Thread):
                                                     job.status = 'UND'
                                                     job.relayAllowed = False
                                                     break
+                                                elif '450' in reply:
+                                                    self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + job.mxServer + ' host could not find your reverse hostname, assuming all main emails valid for ' + job.host, 'FAIL'))
+                                                    job.status = 'UND'
+                                                    break
                                                 else:
                                                     pass
 
