@@ -23,6 +23,7 @@ class Job(object):
 		self.replies = []
 		self.relayAllowed = True
 		self.serverResponsive = None
+		self.accountsVerified = 0
 
 		Job.jobsList.append(self)
 		Job.jobsCount += 1

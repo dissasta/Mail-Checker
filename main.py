@@ -131,10 +131,9 @@ class MainWindow(Frame):
 	def updateMainStates(self):
 		#to screen log printing logic
 		if self.verifierLog:
-			self.statLabel.config(state=NORMAL)
-			self.statLabel.delete('1.0', END)
-			if len(self.verifierLog) >= 11:
-
+			if len(self.verifierLog) >= 10:
+				self.statLabel.config(state=NORMAL)
+				self.statLabel.delete('1.0', END)
 				#self.logToFile(text)
 
 				for i in range(10):
@@ -149,11 +148,14 @@ class MainWindow(Frame):
 				self.verifierLog.pop(0)
 
 			else:
+				self.statLabel.config(state=NORMAL)
+				self.statLabel.delete('1.0', END)
 				for i in range(len(self.verifierLog)):
 					self.statLabel.insert(END, self.verifierLog[i][0]  + '\n', self.verifierLog[i][1])
 
 			self.statLabel.config(state=DISABLED)
-
+		print self.verifierLog
+		print len(self.verifierLog)
 		#job count label update
 		if self.hdButtonTick.get():
 			finalCounter = self.customCount
@@ -330,7 +332,7 @@ class MainWindow(Frame):
 				for i in range(1, 11):
 					thread = Verifier(i, self)
 					thread.start()
-					time.sleep(0.3)
+					time.sleep(0.1)
 
 	def logToFile(self, text):
 		log = open(os.path.join(logFolder, logFile), 'a')

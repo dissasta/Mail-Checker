@@ -115,6 +115,7 @@ class Verifier(threading.Thread):
                                                 if '250' in reply:
                                                     self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + account + '@' + job.host + ' successfully verified as existing on host domain', 'IN'))
                                                     Verifier.verified += 1
+                                                    job.accountsVerified +=1
                                                     job.accounts[id][-1] = True
                                                     print job.accounts[id]
                                                     if type == 'main':
@@ -123,8 +124,9 @@ class Verifier(threading.Thread):
                                                         Job.jobsResultsCustom.append(account + '@' + job.host)
                                                     job.replies.append(account)
                                                     job.serverResponsive = True
-                                                elif '550' in reply:
+                                                elif '550' in reply or '511' in reply:
                                                     Verifier.verified += 1
+                                                    job.accountsVerified +=1
                                                     self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + account + '@' + job.host + ' doesn\'t exist on host domain', 'FAIL'))
                                                     job.accounts[id][-1] = False
                                                     if type == 'main':
@@ -137,7 +139,7 @@ class Verifier(threading.Thread):
                                                     job.status = 'UND'
                                                     job.relayAllowed = False
                                                     break
-                                                elif '450' in reply:
+                                                elif '450' in reply or 'reverse hostname' in reply:
                                                     self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + job.mxServer + ' host could not find your reverse hostname, assuming all main emails valid for ' + job.host, 'FAIL'))
                                                     job.status = 'UND'
                                                     break
@@ -145,7 +147,6 @@ class Verifier(threading.Thread):
                                                     pass
 
                                         conn.write('QUIT'.encode('ascii') + b"\n")
-                                        job.status = 'DONE'
                                         print job.host, job.replies
 
                                     else:
@@ -165,6 +166,9 @@ class Verifier(threading.Thread):
                         if job.status == 'DEAD':
                             print 'no jobs saved'
                         elif job.status == 'UND':
+                            print len(job.accounts) - job.accountsVerified
+                            if job.accountsVerified != len(job.accounts):
+                                Verifier.verified += len(job.accounts) - job.accountsVerified
                             for account, type, result in job.accounts:
                                 if type == 'MAIN' and result != False:
                                     Job.jobsResultsMain.append(account + '@' + job.host)
