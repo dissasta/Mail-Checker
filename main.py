@@ -30,6 +30,7 @@ class MainWindow(Frame):
 		self.log = []
 		self.verifierLog = []
 		self.rows = 1
+		self.statLabelFull = False
 		self.taskActive = False
 		self.after(1, self.updateMainStates)
 		self.emailDir = {}
@@ -132,6 +133,7 @@ class MainWindow(Frame):
 		#to screen log printing logic
 		if self.verifierLog:
 			if len(self.verifierLog) >= 10:
+				self.statLabelFull = True
 				self.statLabel.config(state=NORMAL)
 				self.statLabel.delete('1.0', END)
 				#self.logToFile(text)
@@ -148,8 +150,9 @@ class MainWindow(Frame):
 				self.verifierLog.pop(0)
 
 			else:
-				self.statLabel.config(state=NORMAL)
-				self.statLabel.delete('1.0', END)
+				if not self.statLabelFull:
+					self.statLabel.config(state=NORMAL)
+					self.statLabel.delete('1.0', END)
 				for i in range(len(self.verifierLog)):
 					self.statLabel.insert(END, self.verifierLog[i][0]  + '\n', self.verifierLog[i][1])
 
