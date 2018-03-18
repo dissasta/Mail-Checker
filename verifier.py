@@ -52,13 +52,14 @@ class Verifier(threading.Thread):
                         if job.mx:
                             self.master.verifierLog.append(('TH-' + str(self.id) + ': Found ' + str(len(job.mx)) + ' MX record(s) for host ' + job.host, 'OK'))
                             for pri, mxServer in job.mx:
+                                print mxServer
                                 try:
                                     self.master.verifierLog.append(('TH-' + str(self.id) + ': Trying to establish connection with ' + mxServer, 'NA'))
+                                    job.mxServer = mxServer
                                     conn = telnetlib.Telnet(mxServer, 25, timeout=10)
                                     if conn:
                                         self.master.verifierLog.append(('TH-' + str(self.id) + ': Successfuly opened connection to ' + mxServer, 'OK'))
                                         job.connected = True
-                                        job.mxServer = mxServer
                                         time.sleep(2)
                                         break
 
@@ -71,48 +72,64 @@ class Verifier(threading.Thread):
                                     print 'telnet connection was forcefully closed'
 
                             if job.connected:
-                                reply = conn.read_until('\n')
-                                print '0', reply.rstrip()
-                                if '554' in reply:
-                                    self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + job.mxServer + ' doesn\'t allow communication via Telnet protocol, assuming all main emails valid for ' + job.host, 'FAIL'))
-                                    job.status = 'UND'
-                                elif '450' in reply:
-                                    self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + job.mxServer + ' couldn\'t find reverse hostname for your IP, assuming all main emails valid for ' + job.host, 'FAIL'))
-                                    job.status = 'UND'
-                                elif '220' in reply:
-                                    conn.write('HELO hi'.encode('ascii') + b"\n")
-                                    reply = conn.read_until('\n')
-                                    if '250' in reply:
-                                        self.master.verifierLog.append(('TH-' + str(self.id) + ': Managed successful handshake with ' + job.mxServer, 'OK'))
-                                        job.greeted = True
-                                    else:
-                                        time.sleep(2)
+                                try:
+                                    reply = conn.read_until('\n', timeout=5)
+                                    print '0', reply.rstrip()
+                                    if '554' in reply:
+                                        self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + job.mxServer + ' doesn\'t allow communication via Telnet protocol, assuming all main emails valid for ' + job.host, 'FAIL'))
+                                        job.status = 'UND'
+                                    elif '450' in reply:
+                                        self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + job.mxServer + ' couldn\'t find reverse hostname for your IP, assuming all main emails valid for ' + job.host, 'FAIL'))
+                                        job.status = 'UND'
+                                    elif '220' in reply:
                                         conn.write('HELO hi'.encode('ascii') + b"\n")
-                                        reply = conn.read_until('\n')
+                                        reply = conn.read_until('\n', timeout=5)
                                         if '250' in reply:
                                             self.master.verifierLog.append(('TH-' + str(self.id) + ': Managed successful handshake with ' + job.mxServer, 'OK'))
                                             job.greeted = True
-
-                                    print '1', reply.rstrip()
-
-                                    if job.greeted:
-                                        for (id, (account, type, result)) in enumerate(job.accounts):
-                                            time.sleep(1)
-                                            if not job.mailFrom:
-                                                conn.write('MAIL from: me@my.com'.encode('ascii') + b"\n")
-                                                reply = conn.read_until('\n')
-                                                print '2', reply.rstrip()
+                                        else:
+                                            time.sleep(2)
+                                            conn.write('HELO hi'.encode('ascii') + b"\n")
+                                            reply = conn.read_until('\n', timeout=5)
+                                            if '250' in reply:
+                                                self.master.verifierLog.append(('TH-' + str(self.id) + ': Managed successful handshake with ' + job.mxServer, 'OK'))
+                                                job.greeted = True
+                                            else:
+                                                time.sleep(2)
+                                                conn.write('HELO hi'.encode('ascii') + b"\n")
+                                                reply = conn.read_until('\n', timeout=5)
                                                 if '250' in reply:
-                                                    self.master.verifierLog.append(('TH-' + str(self.id) + ': Server ' + job.mxServer + ' accepted "MAIL from" command', 'OK'))
-                                                    job.mailFrom = True
-                                                elif '553' in reply:
-                                                    self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + job.mxServer + ' rejected "MAIL from" command, assuming all main emails valid for ' + job.host, 'FAIL'))
+                                                    self.master.verifierLog.append(('TH-' + str(
+                                                        self.id) + ': Managed successful handshake with ' + job.mxServer, 'OK'))
+                                                    job.greeted = True
+                                                else:
                                                     job.status = 'UND'
-                                                    break
+                                                    conn.close()
 
-                                            if job.mailFrom and job.relayAllowed:
-                                                print ('RCPT to: ' + account + '@' + job.host)
-                                                conn.write(('RCPT to: ' + account + '@' + job.host + '\n').encode('ascii') + b"\n")
+                                        print '1', reply.rstrip()
+
+                                except EOFError:
+                                    self.master.verifierLog.append(('TH-' + str(self.id) + ': Telnet connection for ' + job.mxServer + ' was forcefully closed, assuming all main emails valid for ' + job.host, 'OK'))
+                                    print 'telnet connection was forcefully closed'
+
+                                if job.greeted:
+                                    for (id, (account, type, result)) in enumerate(job.accounts):
+                                        time.sleep(1)
+                                        if not job.mailFrom:
+                                            conn.write('MAIL from: me@my.com'.encode('ascii') + b"\n")
+                                            reply = conn.read_until('\n')
+                                            print '2', reply.rstrip()
+                                            if '250' in reply:
+                                                self.master.verifierLog.append(('TH-' + str(self.id) + ': Server ' + job.mxServer + ' accepted "MAIL from" command', 'OK'))
+                                                job.mailFrom = True
+                                            elif '553' in reply:
+                                                self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + job.mxServer + ' rejected "MAIL from" command, assuming all main emails valid for ' + job.host, 'FAIL'))
+                                                job.status = 'UND'
+                                                break
+
+                                        if job.mailFrom and job.relayAllowed:
+                                            try:
+                                                conn.write(('RCPT to: ' + account + '@' + job.host).encode('ascii', errors='replace') + b"\n")
                                                 reply = conn.read_until('\n')
                                                 print '3', reply.rstrip()
                                                 if '250' in reply:
@@ -127,7 +144,16 @@ class Verifier(threading.Thread):
                                                         Job.jobsResultsCustom.append(account + '@' + job.host)
                                                     job.replies.append(account)
                                                     job.serverResponsive = True
-                                                elif '550' in reply or '511' in reply:
+
+                                                elif '550' in reply and 'banned' in reply:
+                                                    self.master.verifierLog.append(('TH-' + str(self.id) + ':  your IP seems to be banned on ' + job.mxServer + ', assuming all main emails valid for ' + job.host, 'FAIL'))
+                                                    job.status = 'UND'
+                                                    break
+                                                elif '550' in reply and 'protocol' in reply:
+                                                    self.master.verifierLog.append(('TH-' + str(self.id) + ':  your IP seems to be banned on ' + job.mxServer + ', assuming all main emails valid for ' + job.host, 'FAIL'))
+                                                    job.status = 'UND'
+                                                    break
+                                                elif '550' in reply or '511' in reply or '501 in reply':
                                                     Verifier.verified += 1
                                                     job.accountsVerified +=1
                                                     self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + account + '@' + job.host + ' doesn\'t exist on host domain', 'FAIL'))
@@ -146,17 +172,28 @@ class Verifier(threading.Thread):
                                                     self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + job.mxServer + ' host could not find your reverse hostname, assuming all main emails valid for ' + job.host, 'FAIL'))
                                                     job.status = 'UND'
                                                     break
+                                                elif '503' in reply:
+                                                    self.master.verifierLog.append(('TH-' + str(self.id) + ': ' + job.mxServer + ' client host declined, assuming all main emails valid for ' + job.host, 'FAIL'))
+                                                    job.status = 'UND'
+                                                    break
                                                 else:
                                                     pass
 
+                                            except Exception:
+                                                job.status = 'UND'
+                                    try:
                                         conn.write('QUIT'.encode('ascii') + b"\n")
-                                        print job.host, job.replies
-
-                                    else:
-                                        job.greeted = False
-                                        self.master.verifierLog.append(('TH-' + str(self.id) + ': Failed to handshake with the server, assuming all main emails valid for ' + job.host, 'FAIL'))
+                                    except Exception:
                                         job.status = 'UND'
-                                    conn.close()
+                                        pass
+
+                                    print job.host, job.replies
+
+                                else:
+                                    job.greeted = False
+                                    self.master.verifierLog.append(('TH-' + str(self.id) + ': Failed to handshake with the server, assuming all main emails valid for ' + job.host, 'FAIL'))
+                                    job.status = 'UND'
+                                conn.close()
 
                             else:
                                 self.master.verifierLog.append(('TH-' + str(self.id) + ': Failed to establish connection with any of the MX servers for ' + job.host + ' assuming all main emails valid', 'FAIL'))
@@ -168,6 +205,9 @@ class Verifier(threading.Thread):
 
                         if job.status == 'DEAD':
                             print 'no jobs saved'
+                            if job.accountsVerified != len(job.accounts):
+                                Verifier.verified += len(job.accounts) - job.accountsVerified
+
                         elif job.status == 'UND':
                             print len(job.accounts) - job.accountsVerified
                             if job.accountsVerified != len(job.accounts):

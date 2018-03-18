@@ -98,21 +98,21 @@ class MainWindow(Frame):
 			with open(self.openSaveFile, 'w') as file:
 				for i in Job.jobsResultsMain:
 					print 'good results main: ' + i
-					file.write(i + '\n')
+					file.write((i + '\n').decode('windows-1250'))
 
 				for i in Job.jobsResultsCustom:
 					print 'good results custom: ' + i
-					file.write(i + '\n')
+					file.write((i + '\n').decode('windows-1250'))
 
 			if Job.jobsResultsMainFailed or Job.jobsResultsCustomFailed:
 				with open(self.openSaveFile.split('.')[0] + '_failed' + '.txt', 'w') as file:
 					for i in Job.jobsResultsMainFailed:
 						print 'failed results main: ' + i
-						file.write(i + '\n')
+						file.write((i + '\n').encode('windows-1250').decode('windows-1250'))
 
 					for i in Job.jobsResultsCustomFailed:
 						print 'failed results custom: ' + i
-						file.write(i + '\n')
+						file.write((i + '\n').decode('windows-1250'))
 
 	def openFile(self):
 		self.openFile = tkFileDialog.askopenfilename(filetypes = (('text files', '*.txt'),))
@@ -284,13 +284,13 @@ class MainWindow(Frame):
 							if host in self.emailDir:
 								#if domain already exists in the directory, add the additional account to the list. Only if it doesn't exist yet.
 								if not [account, 'main', None] in self.emailDir[host]:
-									self.emailDir[host].append([account.decode('utf-8'), 'main', None])
+									self.emailDir[host].append([account, 'main', None])
 									self.totalCount += 1
 									emailCount += 1
 
 							else:
 								#if account/domain doesn't exist add a directory entry
-								self.emailDir[host] = [[account.decode('utf-8'), 'main', None]]
+								self.emailDir[host] = [[account, 'main', None]]
 								self.totalCount += 1
 								emailCount += 1
 
@@ -339,13 +339,13 @@ class MainWindow(Frame):
 			self.writeToLog('Adding custom queries to jobs', 'OK')
 			for job in Job.jobsList:
 				for query in queries:
-					query = query.encode('utf-8').decode('utf-8')
-					print 'QUERY: ', query.encode('utf-8')
-					if not (query, 'main', None) in job.accounts:
+					query = query.encode('utf-8')
+					print 'QUERY: ', query
+					if not [query, 'main', None] in job.accounts:
 						self.customCount += 1
 						self.writeToLog('Added: ' + query + '@' + job.host, 'NA')
 						job.accounts.append([query, 'custom', None])
-						print job.accounts
+
 
 	def runJobs(self):
 		if Job.jobsList:
