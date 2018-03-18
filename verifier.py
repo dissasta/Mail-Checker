@@ -1,6 +1,8 @@
+# -*- coding: utf-8 -*
 import threading
 import time
 import os
+import sys
 from job import *
 import telnetlib
 import socket
@@ -109,7 +111,8 @@ class Verifier(threading.Thread):
                                                     break
 
                                             if job.mailFrom and job.relayAllowed:
-                                                conn.write('RCPT to: ' + (account + '@' + job.host).encode('ascii') + b"\n")
+                                                print ('RCPT to: ' + account + '@' + job.host)
+                                                conn.write(('RCPT to: ' + account + '@' + job.host + '\n').encode('ascii') + b"\n")
                                                 reply = conn.read_until('\n')
                                                 print '3', reply.rstrip()
                                                 if '250' in reply:

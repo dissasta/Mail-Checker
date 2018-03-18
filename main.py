@@ -1,7 +1,8 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*
 from Tkinter import *
 from job import *
 from verifier import *
+import tkFont
 import tkFileDialog
 import os
 import sys
@@ -11,7 +12,7 @@ import ttk
 import threading
 from datetime import datetime
 
-globFont = "Verdana 8 bold"
+globFont = "Verdena 8 bold"
 logFolder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'LOGS')
 logFile = str(datetime.now().strftime('%Y-%m-%d %H.%M.%S')) + ' LOG.txt'
 
@@ -32,6 +33,8 @@ class MainWindow(Frame):
 		self.rows = 1
 		self.statLabelFull = False
 		self.taskActive = False
+		self.exportFails = False
+		self.openSaveFile = None
 		self.after(1, self.updateMainStates)
 		self.emailDir = {}
 		self.lock = threading.Lock()
@@ -61,6 +64,7 @@ class MainWindow(Frame):
 		self.svLabel.config(state=DISABLED)
 		self.hdLabel = Label(self.mainFrame, text='Custom queries:', background = 'GREY')
 		self.hdEntry = Text(self.mainFrame, height = 10, width = 20, background = '#424242', foreground = "#2195E7")
+		#self.hdEntry.configure(encode = 'utf-8')
 		self.hdButton = Checkbutton(self.mainFrame, text="Exclusive Mode", variable=self.hdButtonTick, background = 'GREY')
 		self.countLabel = Label(self.mainFrame, text='0 / 0', background = 'GREY')
 		self.strtButton = Button(self.mainFrame, text= "START", width = 8, command=self.runJobs, state=DISABLED)
@@ -90,17 +94,25 @@ class MainWindow(Frame):
 		self.exportButton = self.mainFrame.create_window(22, 82, anchor = NW, window = self.exButton)
 
 	def exportOutputFile(self):
-		for i in Job.jobsResultsMain:
-			print 'good results main: ' + i
+		if self.openSaveFile:
+			with open(self.openSaveFile, 'w') as file:
+				for i in Job.jobsResultsMain:
+					print 'good results main: ' + i
+					file.write(i + '\n')
 
-		for i in Job.jobsResultsMainFailed:
-			print 'failed results main: ' + i
+				for i in Job.jobsResultsCustom:
+					print 'good results custom: ' + i
+					file.write(i + '\n')
 
-		for i in Job.jobsResultsCustom:
-			print 'good results custom: ' + i
+			if Job.jobsResultsMainFailed or Job.jobsResultsCustomFailed:
+				with open(self.openSaveFile.split('.')[0] + '_failed' + '.txt', 'w') as file:
+					for i in Job.jobsResultsMainFailed:
+						print 'failed results main: ' + i
+						file.write(i + '\n')
 
-		for i in Job.jobsResultsCustomFailed:
-			print 'failed results custom: ' + i
+					for i in Job.jobsResultsCustomFailed:
+						print 'failed results custom: ' + i
+						file.write(i + '\n')
 
 	def openFile(self):
 		self.openFile = tkFileDialog.askopenfilename(filetypes = (('text files', '*.txt'),))
@@ -113,30 +125,44 @@ class MainWindow(Frame):
 			self.scanFile(self.openFile)
 
 	def openOutputFile(self):
-		self.openOutputFile = tkFileDialog.asksaveasfilename(filetypes = (('text files', '*.txt'),))
-
-		if self.openOutputFile:
-			if len(self.openOutputFile.split('.')) == 1:
-				self.openOutputFile += '.txt'
+		self.openSaveFile = tkFileDialog.asksaveasfilename(filetypes = (('text files', '*.txt'),))
+		if self.openSaveFile:
+			if len(self.openSaveFile.split('.')) == 1:
+				self.openSaveFile += '.txt'
 			else:
-				if self.openOutputFile.split('.')[-1] != 'txt':
-					self.openOutputFile += '.txt'
+				if self.openSaveFile.split('.')[-1] != 'txt':
+					self.openSaveFile += '.txt'
 
 			self.svLabel.config(state=NORMAL)
 			self.svLabel.delete('1.0', END)
-			self.svLabel.insert('1.0', self.openOutputFile)
+			self.svLabel.insert('1.0', self.openSaveFile)
 			self.svLabel.config(state=DISABLED)
 
-			print self.openOutputFile
+	def cleanLogLines(self, logLength):
+		for i in range(logLength):
+			# find longer than 91 chars and split
+			if len(self.verifierLog[i][0]) > 91:
+				string1 = ''
+				print self.verifierLog[i][0]
+				words = self.verifierLog[i][0][0: 91].split(' ')[0: -1]
+				for word in words:
+					string1 += word + ' '
+				string1 = string1[:-1]
+
+				string2 = '     ' + self.verifierLog[i][0][len(string1):]
+
+				self.verifierLog.insert(i, (string2, self.verifierLog[i][-1]))
+				self.verifierLog.insert(i, (string1, self.verifierLog[i][-1]))
+				del (self.verifierLog[i + 2])
 
 	def updateMainStates(self):
 		#to screen log printing logic
 		if self.verifierLog:
 			if len(self.verifierLog) >= 10:
+				self.cleanLogLines(10)
 				self.statLabelFull = True
 				self.statLabel.config(state=NORMAL)
 				self.statLabel.delete('1.0', END)
-				#self.logToFile(text)
 
 				for i in range(10):
 
@@ -147,18 +173,18 @@ class MainWindow(Frame):
 						self.statLabel.insert(END, self.verifierLog[i][0] + '\n', self.verifierLog[i][1])
 
 				self.statLabel.config(state=DISABLED)
+				self.logToFile(self.verifierLog[0][0])
 				self.verifierLog.pop(0)
 
 			else:
+				self.cleanLogLines(len(self.verifierLog))
 				if not self.statLabelFull:
 					self.statLabel.config(state=NORMAL)
 					self.statLabel.delete('1.0', END)
 				for i in range(len(self.verifierLog)):
 					self.statLabel.insert(END, self.verifierLog[i][0]  + '\n', self.verifierLog[i][1])
-
 			self.statLabel.config(state=DISABLED)
-		print self.verifierLog
-		print len(self.verifierLog)
+
 		#job count label update
 		if self.hdButtonTick.get():
 			finalCounter = self.customCount
@@ -228,6 +254,11 @@ class MainWindow(Frame):
 			self.hdButton.config(state=NORMAL)
 			self.hdEntry.config(state=NORMAL)
 
+			if self.verifierLog:
+				for i in self.verifierLog:
+					self.logToFile(i[0])
+				self.verifierLog = []
+
 		self.after(100, self.updateMainStates)
 
 	def scanFile(self, file):
@@ -252,14 +283,14 @@ class MainWindow(Frame):
 							importCount += 1
 							if host in self.emailDir:
 								#if domain already exists in the directory, add the additional account to the list. Only if it doesn't exist yet.
-								if not account in self.emailDir[host]:
-									self.emailDir[host].append([account, 'main', None])
+								if not [account, 'main', None] in self.emailDir[host]:
+									self.emailDir[host].append([account.decode('utf-8'), 'main', None])
 									self.totalCount += 1
 									emailCount += 1
 
 							else:
 								#if account/domain doesn't exist add a directory entry
-								self.emailDir[host] = [[account, 'main', None]]
+								self.emailDir[host] = [[account.decode('utf-8'), 'main', None]]
 								self.totalCount += 1
 								emailCount += 1
 
@@ -296,6 +327,8 @@ class MainWindow(Frame):
 
 	def clearLog(self):
 		self.log = []
+		self.verifierLog = []
+		self.statLabelFull = False
 		self.statLabel.config(state=NORMAL)
 		self.statLabel.delete('1.0', END)
 		self.statLabel.config(state=DISABLED)
@@ -304,12 +337,10 @@ class MainWindow(Frame):
 		queries = set([x for x in self.hdEntry.get('1.0', END).split('\n') if x != ''])
 		if queries:
 			self.writeToLog('Adding custom queries to jobs', 'OK')
-			print queries
 			for job in Job.jobsList:
 				for query in queries:
-					print query
-					#query = query.decode('utf-8')
-
+					query = query.encode('utf-8').decode('utf-8')
+					print 'QUERY: ', query.encode('utf-8')
 					if not (query, 'main', None) in job.accounts:
 						self.customCount += 1
 						self.writeToLog('Added: ' + query + '@' + job.host, 'NA')
@@ -324,7 +355,7 @@ class MainWindow(Frame):
 			Job.clearResults()
 			self.addCustom()
 			self.writeToLog('Batch e-mail verification process started.', 'OK')
-			self.writeToLog('INIT Threads.', 'OK')
+			self.writeToLog('Initializing Threads.', 'OK')
 			self.taskActive = True
 			self.fnButton.config(state=DISABLED)
 			self.hdButton.config(state=DISABLED)
